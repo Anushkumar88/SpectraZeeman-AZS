@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anomalous Zeeman Effect Analyzer | Automated Spectral Line Splitting</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- SIDEBAR CONTROLS -->
+    <aside class="sidebar">
+      <div class="brand-header">
+        <div class="brand-icon">⚛️</div>
+        <div>
+          <div class="brand-title">Zeeman Spectrometer</div>
+          <div class="brand-sub">Automated Line Splitting Engine</div>
+        </div>
+      </div>
+
+      <!-- 1. Transition Selector -->
+      <div class="control-group">
+        <div class="group-title">1. Atomic Transition</div>
+        <label for="select-transition" class="field-label">Spectral Line:</label>
+        <select id="select-transition" class="select-input">
+          <option value="Sodium D2 (589.0 nm)" selected>Sodium D2 (589.0 nm, 6 lines)</option>
+          <option value="Sodium D1 (589.6 nm)">Sodium D1 (589.6 nm, 4 lines)</option>
+          <option value="Cadmium Singlet (643.8 nm - Normal Zeeman)">Cadmium Singlet (643.8 nm - Normal)</option>
+          <option value="Zinc Triplet Component 1 (468.0 nm)">Zinc Triplet 1 (468.0 nm, 3 lines)</option>
+          <option value="Zinc Triplet Component 2 (472.2 nm)">Zinc Triplet 2 (472.2 nm, 6 lines)</option>
+          <option value="Zinc Triplet Component 3 (481.1 nm)">Zinc Triplet 3 (481.1 nm, 9 lines)</option>
+          <option value="Mercury Green Line (546.1 nm)">Mercury Green (546.1 nm, 9 lines)</option>
+          <option value="Custom">Custom State Parameters...</option>
+        </select>
+
+        <div id="custom-transition-group" style="display: none; margin-top: 10px;">
+          <input type="text" id="cust-name" class="text-input" placeholder="Line Name" value="Custom Transition" style="margin-bottom:6px;">
+          <input type="number" id="cust-lam" class="num-input" placeholder="λ0 [nm]" value="550.0" step="0.1" style="margin-bottom:6px;">
+        </div>
+      </div>
+
+      <!-- 2. Magnetic Field Control -->
+      <div class="control-group">
+        <div class="group-title">2. Magnetic Field Strength</div>
+        <div class="slider-container">
+          <div class="slider-header">
+            <span>Field B [Tesla]:</span>
+            <span id="val-bfield" class="slider-val">1.20 T</span>
+          </div>
+          <input type="range" id="slider-bfield" class="range-input" min="0.0" max="3.0" step="0.05" value="1.20">
+        </div>
+        <div class="preset-grid">
+          <button class="btn-preset" data-b="0.0">0.0 T</button>
+          <button class="btn-preset" data-b="0.8">0.8 T</button>
+          <button class="btn-preset active" data-b="1.2">1.2 T</button>
+          <button class="btn-preset" data-b="2.0">2.0 T</button>
+        </div>
+      </div>
+
+      <!-- 3. Optical Observation & Polarization -->
+      <div class="control-group">
+        <div class="group-title">3. Optical Geometry & Filter</div>
+        <div class="field-label">Observation Line of Sight:</div>
+        <div class="radio-cards" style="margin-bottom: 12px;">
+          <label class="radio-label">
+            <input type="radio" name="obs-mode" value="Transverse" checked>
+            <span>Transverse (⊥ B, π and σ visible)</span>
+          </label>
+          <label class="radio-label">
+            <input type="radio" name="obs-mode" value="Longitudinal">
+            <span>Longitudinal (∥ B, π suppressed)</span>
+          </label>
+        </div>
+
+        <label for="select-polarizer" class="field-label">Polarization Analyzer:</label>
+        <select id="select-polarizer" class="select-input">
+          <option value="None (All)" selected>None (Unpolarized)</option>
+          <option value="Linear || B (pi only)">Linear ∥ B (π only)</option>
+          <option value="Linear perp B (sigma only)">Linear ⊥ B (σ only)</option>
+          <option value="Circular (sigma+ only)">Circular (σ⁺ RCP only)</option>
+          <option value="Circular (sigma- only)">Circular (σ⁻ LCP only)</option>
+        </select>
+      </div>
+
+      <!-- 4. Line Broadening & Detector Noise -->
+      <div class="control-group">
+        <div class="group-title">4. Broadening & Noise</div>
+        <div class="slider-container">
+          <div class="slider-header">
+            <span>Gaussian FWHM (Doppler):</span>
+            <span id="val-fwhm-g" class="slider-val">3.5 pm</span>
+          </div>
+          <input type="range" id="slider-fwhm-g" class="range-input" min="0.001" max="0.008" step="0.0005" value="0.0035">
+        </div>
+        <div class="slider-container">
+          <div class="slider-header">
+            <span>Lorentzian FWHM (Instrument):</span>
+            <span id="val-fwhm-l" class="slider-val">1.5 pm</span>
+          </div>
+          <input type="range" id="slider-fwhm-l" class="range-input" min="0.0005" max="0.004" step="0.0005" value="0.0015">
+        </div>
+        <label class="checkbox-label" style="margin-top: 8px;">
+          <input type="checkbox" id="check-noise" checked>
+          <span>Simulate Detector Noise & Drift</span>
+        </label>
+      </div>
+
+      <!-- 5. Automated Peak Detection Controls -->
+      <div class="control-group">
+        <div class="group-title">5. Peak Detection Settings</div>
+        <div class="slider-container">
+          <div class="slider-header">
+            <span>Prominence Sensitivity:</span>
+            <span id="val-prominence" class="slider-val">5%</span>
+          </div>
+          <input type="range" id="slider-prominence" class="range-input" min="0.02" max="0.15" step="0.01" value="0.05">
+        </div>
+        <label class="checkbox-label">
+          <input type="checkbox" id="check-refine" checked>
+          <span>Sub-Pixel Gaussian Centroid Fit</span>
+        </label>
+      </div>
+    </aside>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="main-content">
+      <!-- Hero Header -->
+      <header class="hero-banner">
+        <h1 class="hero-title">Analysis of the Anomalous Zeeman Effect</h1>
+        <p class="hero-subtitle">
+          Automated Spectral Line Splitting, Sub-Pixel Centroid Fitting, Quantum Sub-Levels, and Electron Specific Charge (e/m) Determination.
+        </p>
+      </header>
+
+      <!-- Key Physical Metrics Row -->
+      <section class="metrics-row">
+        <div class="metric-card">
+          <div class="metric-label">Magnetic Field</div>
+          <div id="metric-bfield" class="metric-value">1.20 T</div>
+          <div id="metric-obs" class="metric-sub">Transverse View</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Central Wavelength</div>
+          <div id="metric-wavelength" class="metric-value">588.9950 nm</div>
+          <div id="metric-energy" class="metric-sub">E₀ = 2.104 eV</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Upper Landé g</div>
+          <div id="metric-up-g" class="metric-value">1.333</div>
+          <div id="metric-up-term" class="metric-sub">^2P_3/2 (J=1.5)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Lower Landé g</div>
+          <div id="metric-low-g" class="metric-value">2.000</div>
+          <div id="metric-low-term" class="metric-sub">^2S_1/2 (J=0.5)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Zeeman Class</div>
+          <div id="metric-class" class="metric-value" style="color: var(--accent-coral);">Anomalous</div>
+          <div id="metric-split" class="metric-sub">Max Split: ±28.6 pm</div>
+        </div>
+      </section>
+
+      <!-- Navigation Tabs -->
+      <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-spectrum">🔬 Spectrum & Peaks</button>
+        <button class="tab-btn" data-tab="tab-levels">⚛️ Energy Levels</button>
+        <button class="tab-btn" data-tab="tab-field">📈 B-Field Sweep & e/m</button>
+        <button class="tab-btn" data-tab="tab-theory">🏛️ Physics & Theory</button>
+        <button class="tab-btn" data-tab="tab-experimental">📁 Experimental Data</button>
+        <button class="tab-btn" data-tab="tab-guide">ℹ️ Project Guide & Viva</button>
+      </nav>
+
+      <!-- TAB 1: SPECTRUM & AUTOMATED PEAKS -->
+      <section id="tab-spectrum" class="tab-pane active">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">1. High-Resolution Spectral Profile & Peak Detection</div>
+            <div class="chart-controls">
+              <label class="checkbox-label">
+                <input type="checkbox" id="check-show-components" checked>
+                <span>Component Curves</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="check-show-b0" checked>
+                <span>B = 0 Reference</span>
+              </label>
+            </div>
+          </div>
+          <canvas id="canvas-spectrum" height="380" style="width: 100%; border-radius: 6px;"></canvas>
+        </div>
+
+        <!-- 2D CCD Detector Spectrograph Slit -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">2. Simulated 2D CCD Spectrograph Detector Image (Slit Focal Plane)</div>
+          </div>
+          <canvas id="canvas-ccd" height="85" style="width: 100%; border-radius: 6px;"></canvas>
+        </div>
+
+        <!-- Detected Peaks Table -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">3. Automated Peak Analysis & Quantum Component Assignment Table</div>
+            <div class="chart-controls">
+              <button id="btn-download-peaks" class="btn-primary">📥 Download Peaks CSV</button>
+              <button id="btn-download-spectrum" class="btn-secondary">📥 Download Spectrum CSV</button>
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Peak #</th>
+                  <th>Measured λ [nm]</th>
+                  <th>Theoretical λ [nm]</th>
+                  <th>Residual [pm]</th>
+                  <th>Shift [cm⁻¹]</th>
+                  <th>Component</th>
+                  <th>Polarization</th>
+                  <th>ΔM_J</th>
+                  <th>FWHM [nm]</th>
+                  <th>Intensity</th>
+                </tr>
+              </thead>
+              <tbody id="peaks-table-body">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: QUANTUM ENERGY LEVELS -->
+      <section id="tab-levels" class="tab-pane">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Quantum Magnetic Sub-Levels & Electric Dipole Allowed Transitions</div>
+          </div>
+          <div id="svg-energy-levels" style="width: 100%; min-height: 480px;">
+            <!-- Dynamically rendered SVG -->
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div class="chart-card">
+            <div class="chart-title" style="margin-bottom: 12px;">Upper State Sub-Levels (g = 1.333)</div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>M_J</th>
+                    <th>Energy Shift [µeV]</th>
+                    <th>Wavenumber Shift [cm⁻¹]</th>
+                  </tr>
+                </thead>
+                <tbody id="up-sublevels-body"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title" style="margin-bottom: 12px;">Lower State Sub-Levels (g = 2.000)</div>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>M_J</th>
+                    <th>Energy Shift [µeV]</th>
+                    <th>Wavenumber Shift [cm⁻¹]</th>
+                  </tr>
+                </thead>
+                <tbody id="low-sublevels-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: B-FIELD SWEEP & e/m -->
+      <section id="tab-field" class="tab-pane">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Automated B-Field Sweep & Precision Specific Charge (e/m) Determination</div>
+            <button id="btn-download-sweep" class="btn-primary">📥 Download Sweep CSV</button>
+          </div>
+          <div style="display: grid; grid-template-columns: 280px 1fr; gap: 24px;">
+            <div>
+              <div class="callout" style="margin-top: 0;">
+                Linear regression of splitting wavenumber Δν̃ versus magnetic field B yields:
+                <br><strong>(e/m) = 4πc · Slope / g_eff</strong>
+              </div>
+
+              <div class="slider-container">
+                <div class="slider-header">
+                  <span>Max Sweep Field:</span>
+                  <span id="val-sweep-max" class="slider-val">2.0 T</span>
+                </div>
+                <input type="range" id="slider-sweep-max" class="range-input" min="1.0" max="3.0" step="0.2" value="2.0">
+              </div>
+
+              <div class="slider-container">
+                <div class="slider-header">
+                  <span>Number of Steps:</span>
+                  <span id="val-sweep-steps" class="slider-val">8</span>
+                </div>
+                <input type="range" id="slider-sweep-steps" class="range-input" min="5" max="15" step="1" value="8">
+              </div>
+
+              <label for="select-sweep-component" class="field-label" style="margin-top: 10px;">Track Component:</label>
+              <select id="select-sweep-component" class="select-input"></select>
+            </div>
+
+            <div>
+              <canvas id="canvas-regression" height="350" style="width: 100%; border-radius: 6px;"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="metrics-row" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="metric-card">
+            <div class="metric-label">Derived (e/mₑ) Ratio</div>
+            <div id="metric-reg-em" class="metric-value">1.751e+11 C/kg</div>
+            <div id="metric-reg-em-err" class="metric-sub" style="color: var(--accent-emerald);">Error: 0.45%</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Derived Bohr Magneton</div>
+            <div id="metric-reg-mub" class="metric-value">9.231e-24 J/T</div>
+            <div id="metric-reg-mub-err" class="metric-sub" style="color: var(--accent-emerald);">Error: 0.45%</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Regression Slope</div>
+            <div id="metric-reg-slope" class="metric-value">0.4652 cm⁻¹/T</div>
+            <div class="metric-sub">Δν̃ / B</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Goodness of Fit (R²)</div>
+            <div id="metric-reg-r2" class="metric-value" style="color: var(--accent-cyan);">0.9995</div>
+            <div class="metric-sub">High Linearity</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: PHYSICS & THEORY -->
+      <section id="tab-theory" class="tab-pane">
+        <div class="chart-card">
+          <div class="chart-title" style="margin-bottom: 14px;">Physical Comparison: Normal vs. Anomalous Zeeman Effect</div>
+          <canvas id="canvas-comparison" height="280" style="width: 100%; border-radius: 6px;"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <h3 style="font-size: 1.15rem; margin-bottom: 12px; color: var(--accent-cyan);">Theoretical Foundations</h3>
+          <p style="margin-bottom: 12px; color: var(--text-muted); line-height: 1.6;">
+            The <strong>Zeeman Effect</strong> refers to the splitting of atomic spectral lines in an external magnetic field. 
+            In the <em>Normal Zeeman Effect</em>, atomic states have zero electron spin ($S = 0$), so $g_1 = g_2 = 1.0$, producing exactly three equidistant lines separated by the Lorentz unit 
+            $\Delta\tilde{\nu}_L = \frac{eB}{4\pi m_e c} \approx 0.46686 \times B\text{ cm}^{-1}$.
+          </p>
+          <p style="margin-bottom: 12px; color: var(--text-muted); line-height: 1.6;">
+            In the <em>Anomalous Zeeman Effect</em>, non-zero electron spin ($S \neq 0$) couples with orbital angular momentum via spin-orbit coupling. 
+            Because the spin gyromagnetic ratio ($g_S \approx 2$) is double that of orbital motion ($g_L = 1$), the total magnetic moment is not parallel to total angular momentum. 
+            The effective Landé $g$-factor is:
+          </p>
+          <div class="callout" style="font-family: var(--font-mono); font-size: 1rem; color: var(--accent-cyan);">
+            g_J = 1 + [J(J + 1) + S(S + 1) - L(L + 1)] / [2 · J · (J + 1)]
+          </div>
+          <p style="color: var(--text-muted); line-height: 1.6;">
+            This lifts the degeneracy of the magnetic sub-levels, yielding complex multiplets of 4, 6, 9, or more lines with unequal separations.
+          </p>
+        </div>
+      </section>
+
+      <!-- TAB 5: EXPERIMENTAL LAB DATA -->
+      <section id="tab-experimental" class="tab-pane">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div class="chart-title">Laboratory Spectrometer Data Ingestion & Analysis</div>
+          </div>
+          <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px;">
+            <div>
+              <label for="select-exp-dataset" class="field-label">Pre-Recorded Lab Run:</label>
+              <select id="select-exp-dataset" class="select-input" style="margin-bottom: 16px;">
+                <option value="Sodium D2 (Lab Run @ 1.15 T)" selected>Sodium D2 (Lab Run @ 1.15 T)</option>
+                <option value="Sodium D1 (Lab Run @ 0.85 T)">Sodium D1 (Lab Run @ 0.85 T)</option>
+                <option value="Cadmium 643.8 nm (Lab Run @ 1.00 T)">Cadmium 643.8 nm (Lab Run @ 1.00 T)</option>
+              </select>
+
+              <label class="field-label">Or Upload Custom CSV:</label>
+              <input type="file" id="file-exp-upload" class="select-input" accept=".csv" style="padding: 6px;">
+              <div class="metric-sub" style="margin-top: 6px;">CSV Format: Wavelength_nm, Intensity</div>
+            </div>
+            <div>
+              <canvas id="canvas-experimental" height="300" style="width: 100%; border-radius: 6px;"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title" style="margin-bottom: 12px;">Experimental Detected Peaks Table</div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Peak #</th>
+                  <th>Measured λ [nm]</th>
+                  <th>Theoretical λ [nm]</th>
+                  <th>Residual [pm]</th>
+                  <th>Component</th>
+                  <th>Polarization</th>
+                  <th>Intensity</th>
+                </tr>
+              </thead>
+              <tbody id="exp-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: PROJECT GUIDE & VIVA -->
+      <section id="tab-guide" class="tab-pane">
+        <div class="chart-card">
+          <h3 style="font-size: 1.15rem; margin-bottom: 12px; color: var(--accent-cyan);">🔬 Laboratory Apparatus Description</h3>
+          <p style="color: var(--text-muted); line-height: 1.6; margin-bottom: 14px;">
+            In a physical physics laboratory, the Anomalous Zeeman Effect setup consists of:
+          </p>
+          <ul style="color: var(--text-main); margin-left: 20px; line-height: 1.8;">
+            <li><strong>Electromagnet & Variable Power Supply</strong>: Produces homogeneous fields up to 2.0 Tesla with bored pole pieces for longitudinal viewing.</li>
+            <li><strong>Spectral Discharge Lamp</strong>: Electrodeless Sodium or Cadmium bulb placed in the pole gap.</li>
+            <li><strong>Optical Collimator & Polarizer</strong>: Linear polarizer and quarter-wave plate to analyze linear and circular polarization states.</li>
+            <li><strong>High-Resolution Dispersive Element</strong>: Fabry-Pérot interferometer etalon or diffraction grating spectrograph with resolving power $\lambda / \Delta\lambda > 10^5$.</li>
+            <li><strong>Digital CCD Camera & Gaussmeter</strong>: Measures spatial fringe splitting and magnetic field strength.</li>
+          </ul>
+        </div>
+
+        <div class="chart-card">
+          <h3 style="font-size: 1.15rem; margin-bottom: 14px; color: var(--accent-cyan);">🎓 Viva-Voce Examination Preparation</h3>
+
+          <div class="faq-item">
+            <div class="faq-question">Q1: What is the fundamental difference between Normal and Anomalous Zeeman Effect?</div>
+            <div class="faq-answer">
+              The Normal Zeeman Effect occurs in singlet transitions where total spin S = 0 (e.g. Cadmium 643.8 nm). Because electron spin is absent, g_1 = g_2 = 1, and the spectral line splits into exactly three equidistant lines. The Anomalous Zeeman Effect occurs in atoms with non-zero spin (S ≠ 0, e.g. Sodium D-lines). Spin-orbit coupling produces distinct Landé g-factors for the upper and lower states (g_1 ≠ g_2), lifting the sub-level degeneracy and resulting in multiplets of 4, 6, 9, or more lines.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-question">Q2: Why are π components absent when observing along the magnetic field (Longitudinal view)?</div>
+            <div class="faq-answer">
+              The π components correspond to transitions with ΔM_J = 0, where the electric dipole oscillates strictly parallel to the magnetic field vector B. Because electromagnetic waves are transverse, an oscillating electric dipole radiates zero energy along its axis of oscillation. Hence, along the longitudinal view (line of sight parallel to B), no π radiation reaches the detector.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-question">Q3: How does this experiment allow the determination of the electron's specific charge (e/m)?</div>
+            <div class="faq-answer">
+              The wavenumber splitting Δν̃ is linearly proportional to the applied field: Δν̃ = [e / (4π m_e c)] · g_eff · B. By performing linear regression of splitting versus magnetic field, the slope m = Δν̃ / B directly yields (e/m) = 4π c · m / g_eff.
+            </div>
+          </div>
+
+          <div class="faq-item">
+            <div class="faq-question">Q4: What are the selection rules for electric dipole Zeeman transitions?</div>
+            <div class="faq-answer">
+              The selection rules are ΔM_J = 0 (π components) and ΔM_J = ±1 (σ components). Transitions with J_upper = 0 to J_lower = 0 are forbidden. When J_upper = J_lower, M_upper = 0 to M_lower = 0 is forbidden for ΔM = 0.
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
